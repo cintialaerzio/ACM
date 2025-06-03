@@ -1,0 +1,433 @@
+# Instalação do pacote necessário para leitura de arquivos .dbc ------------------
+# devtools::install_github("danicat/read.dbc")
+
+# Carregamento de pacotes e definição do diretório de trabalho -------------------
+library(tidyverse)
+setwd("C:/Users/508333/Desktop/Analise_SUS_tj")
+
+# Leitura das bases de dados de violência (2019 a 2024) --------------------------
+VIOBR24 <- read.dbc::read.dbc("VIOLBR24.dbc")
+VIOBR23 <- read.dbc::read.dbc("VIOLBR23.dbc")
+VIOBR22 <- read.dbc::read.dbc("VIOLBR22.dbc")
+VIOBR21 <- read.dbc::read.dbc("VIOLBR21.dbc")
+VIOBR20 <- read.dbc::read.dbc("VIOLBR20.dbc")
+VIOBR19 <- read.dbc::read.dbc("VIOLBR19.dbc")
+
+# Verificação da estrutura dos conjuntos de dados --------------------------------
+# Comparar colunas para garantir a compatibilidade antes da unificação
+janitor::compare_df_cols_same(VIOBR19, VIOBR20, VIOBR21, VIOBR22, VIOBR23, VIOBR24) # Estrutura idêntica
+janitor::compare_df_cols(VIOBR19, VIOBR20, VIOBR21, VIOBR22, VIOBR23, VIOBR24)       # Lista diferenças, se houver
+
+# Unificação dos dados em um único dataframe -------------------------------------
+VIOBR <- rbind(VIOBR19, VIOBR20, VIOBR21, VIOBR22, VIOBR23, VIOBR24)  # Empilhamento por linha (indivíduos)
+
+# Verificação da quantidade total de registros
+nrow(VIOBR19) + nrow(VIOBR20) + nrow(VIOBR21) + nrow(VIOBR22) + nrow(VIOBR23) + nrow(VIOBR24)
+
+# Padronização dos nomes das variáveis ------------------------------------------
+# Convertendo para minúsculas e removendo acentos
+library(janitor)
+VIOBR <- clean_names(VIOBR)
+
+# Visualização geral da base
+glimpse(VIOBR)
+
+# Transformação e recodificação das variáveis ------------------------------------
+VIOBR_recodificados <- VIOBR |>
+
+  # Separação da variável de idade em unidade e valor
+  separate(nu_idade_n, into = c("unidade_idade", "valor_idade"), sep = 1, remove = FALSE) |>
+
+  # Conversão da idade para anos, quando aplicável
+  mutate(idade_anos = case_when(
+    unidade_idade %in% c("1", "2", "3") ~ 0,                  # Horas, dias e meses
+    unidade_idade == "4" ~ as.numeric(valor_idade),           # Anos
+    TRUE ~ NA_real_
+  )) |>
+
+  # Recodificação da orientação sexual
+  mutate(orient_sex = case_when(
+    orient_sex == 1 ~ "Heterossexual",
+    orient_sex == 2 ~ "Homossexual (gay/lésbica)",
+    orient_sex == 3 ~ "Bissexual",
+    orient_sex == 8 ~ "Não se aplica",
+    orient_sex == 9 ~ "Ignorado",
+    TRUE ~ "Outro"
+  )) |>
+
+  # Recodificação da identidade de gênero
+  mutate(ident_gen = case_when(
+    ident_gen == 1 ~ "Travesti",
+    ident_gen == 2 ~ "Transexual Mulher",
+    ident_gen == 3 ~ "Transexual Homem",
+    ident_gen == 8 ~ "Não se aplica",
+    ident_gen == 9 ~ "Ignorado",
+    TRUE ~ "Outro"
+  )) |>
+
+  # Recodificação da motivação da violência
+  mutate(viol_motiv = case_when(
+    viol_motiv == 1 ~ "Sexismo",
+    viol_motiv == 2 ~ "LGBTfobia",
+    viol_motiv == 3 ~ "Racismo",
+    viol_motiv == 4 ~ "Intolerância religiosa",
+    viol_motiv == 5 ~ "Xenofobia",
+    viol_motiv == 6 ~ "Conflito geracional",
+    viol_motiv == 7 ~ "Situação de rua",
+    viol_motiv == 8 ~ "Deficiência",
+    viol_motiv == 9 ~ "Outros",
+    viol_motiv == 88 ~ "Não se aplica",
+    viol_motiv == 99 ~ "Ignorado",
+    TRUE ~ "Outro"
+  )) |>
+
+  # Recodificação do ciclo de vida
+  mutate(cicl_vid = case_when(
+    cicl_vid == 1 ~ "Criança",
+    cicl_vid == 2 ~ "Adolescente",
+    cicl_vid == 3 ~ "Jovem",
+    cicl_vid == 4 ~ "Pessoa adulta",
+    cicl_vid == 5 ~ "Pessoa idosa",
+    cicl_vid == 9 ~ "Ignorado",
+    TRUE ~ "Outro"
+  )) |>
+
+  # Criação da variável de faixa etária
+  mutate(faixa_etaria = cut(
+    idade_anos,
+    breaks = c(-Inf, 9, 19, 29, 39, 49, 59, Inf),
+    labels = c("00 a 09 anos", "10 a 19 anos", "20 a 29 anos",
+               "30 a 39 anos", "40 a 49 anos", "50 a 59 anos",
+               "60 anos ou mais"),
+    right = FALSE,
+    ordered_result = TRUE
+  )) |>
+
+  # Recodificação da escolaridade
+  mutate(escolaridade = case_when(
+    cs_escol_n == "00" ~ "Analfabeto",
+    cs_escol_n == "01" ~ "1ª a 4ª série incompleta do EF",
+    cs_escol_n == "02" ~ "4ª série completa do EF",
+    cs_escol_n == "03" ~ "5ª à 8ª série incompleta do EF",
+    cs_escol_n == "04" ~ "Ensino fundamental completo",
+    cs_escol_n == "05" ~ "Ensino médio incompleto",
+    cs_escol_n == "06" ~ "Ensino médio completo",
+    cs_escol_n == "07" ~ "Educação superior incompleta",
+    cs_escol_n == "08" ~ "Educação superior completa",
+    cs_escol_n == "09" ~ "Ignorado",
+    cs_escol_n == "10" ~ "Não se aplica",
+    is.na(cs_escol_n) ~ "Ignorado"
+  )) |>
+
+  # Definição da ordem dos níveis da escolaridade
+  mutate(escolaridade = factor(
+    escolaridade,
+    levels = c(
+      "Analfabeto", "1ª a 4ª série incompleta do EF",
+      "4ª série completa do EF", "5ª à 8ª série incompleta do EF",
+      "Ensino fundamental completo", "Ensino médio incompleto",
+      "Ensino médio completo", "Educação superior incompleta",
+      "Educação superior completa", "Não se aplica", "Ignorado"
+    )
+  )) |>
+
+  # Recodificação da raça/cor
+  mutate(raca = case_when(
+    cs_raca == "1" ~ "Branca",
+    cs_raca == "2" ~ "Preta",
+    cs_raca == "3" ~ "Amarela",
+    cs_raca == "4" ~ "Parda",
+    cs_raca == "5" ~ "Indígena",
+    cs_raca == "9" ~ "Ignorado",
+    TRUE ~ "Ignorado"
+  )) |>
+
+  # Recodificação do sexo do agressor
+  mutate(sexo_agressor = case_when(
+    autor_sexo == "1" ~ "Masculino",
+    autor_sexo == "2" ~ "Feminino",
+    autor_sexo == "3" ~ "Ambos",
+    autor_sexo == "9" ~ "Ignorado",
+    TRUE ~ "Ignorado"
+  )) |>
+
+  # Recodificação do consumo de álcool pelo agressor
+  mutate(consumo_alcool_agressor = case_when(
+    autor_alco == "1" ~ "Sim",
+    autor_alco == "2" ~ "Não",
+    autor_alco == "9" ~ "Ignorado",
+    TRUE ~ "Ignorado"
+  )) |>
+
+  # Recodificação do local da ocorrência
+  mutate(local_ocor = case_when(
+    local_ocor == 1 ~ "Residência",
+    local_ocor == 2 ~ "Habitação coletiva",
+    local_ocor == 3 ~ "Escola",
+    local_ocor == 4 ~ "Local de prática esportiva",
+    local_ocor == 5 ~ "Bar ou similar",
+    local_ocor == 6 ~ "Via pública",
+    local_ocor == 7 ~ "Comércio/Serviços",
+    local_ocor == 8 ~ "Indústrias/Construção",
+    local_ocor == 9 ~ "Outro",
+    local_ocor == 99 ~ "Ignorado"
+  )) |>
+
+  # Recodificação da variável que indica se houve ocorrência anterior
+  mutate(out_vezes = case_when(
+    out_vezes == 1 ~ "Sim",
+    out_vezes == 2 ~ "Não",
+    out_vezes == 9 ~ "Ignorado"
+  )) |>
+
+  # Recodificação do meio de agressão (consolidado a partir de várias variáveis)
+  mutate(meio_agressao = case_when(
+    ag_forca == "1" | ag_enfor == "1" ~ "força física",
+    ag_objeto == "1" | ag_corte == "1" | ag_quente == "1" ~ "armas/objetos",
+    ag_enven == "1" ~ "envenenamento",
+    ag_fogo == "1" ~ "fogo",
+    ag_ameaca == "1" ~ "ameaça",
+    ag_outros == "1" ~ "outros",
+    TRUE ~ "ignorado"
+  ))
+
+ 
+  # Recodificação da variável relação com a pessoa atendida
+  mutate(relacao_pessoa_atendida = case_when(
+    rel_pai == 1 ~ "pai",
+    rel_mae == 1 ~ "mãe",
+    rel_pad == 1 | rel_mad == 1 ~ "padrasto/madrasta",
+    rel_conj == 1 ~ "cônjuge",
+    rel_excon == 1 ~ "ex-cônjuge",
+    rel_namo == 1 ~ "namorado(a)",
+    rel_exnam == 1 ~ "ex-namorado(a)",
+    rel_filho == 1 ~ "filho(a)",
+    rel_irmao == 1 ~ "irmão(ã)",
+    rel_conhec == 1 ~ "conhecido(a)",
+    rel_cuida == 1 ~ "cuidador(a)",
+    rel_patrao == 1 ~ "patrão/patroa",
+    rel_desco == 1 ~ "desconhecido(a)",
+    TRUE ~ "ignorado"
+  )) |>
+  
+  # Recodificação da variável Consumo - Motivo
+  mutate(consumo_rel = case_when(
+    cons_abort == 1 ~ "aborto",
+    cons_grav == 1 ~ "gravidez",
+    cons_dst == 1 ~ "doenças sexualmente transmissíveis",
+    cons_suic == 1 ~ "suicídio",
+    cons_ment == 1 ~ "transtornos mentais",
+    cons_comp == 1 ~ "complicações",
+    cons_estre == 1 ~ "estresse",
+    cons_outr == 1 ~ "outros fatores",
+    cons_espec == 1 ~ "especificado",
+    TRUE ~ "ignorado"
+  )) |>
+  
+  # Recodificação da variável segunda definição (tipos) de violéncia sexual
+  mutate(viol_sexu_tipo = case_when(
+    sex_assedi == 1 ~ "assédio sexual",
+    sex_estupr == 1 ~ "estupro",
+    sex_pudor == 1 ~ "violação de pudor",
+    sex_porno == 1 ~ "pornografia infantil",
+    sex_explo == 1 ~ "exploração sexual",
+    sex_outro == 1 ~ "outro tipo de violência sexual",
+    TRUE ~ "ignorado"
+  )) |>
+  
+  # Recodificação da variável situação conjugal
+  mutate(situacao_conjugal = case_when(
+    sit_conjug == 1 ~ "solteiro",
+    sit_conjug == 2 ~ "casado/união consensual",
+    sit_conjug == 3 ~ "viúvo",
+    sit_conjug == 4 ~ "separado",
+    sit_conjug == 8 ~ "não se aplica",
+    TRUE ~ "ignorado"
+  )) |>
+  
+
+# Recodificação da variável CBO - Categorias
+  mutate(
+    grupo_cbo = substr(id_ocupa_n, 1, 1),
+    grupo_nome = recode(grupo_cbo,
+                        "1" = "MEMBROS SUPERIORES DO PODER PÚBLICO, DIRIGENTES DE ORGANIZAÇÃO DE INTERESSE PÚBLICO E DE EMPRESA E GERENTES",
+                        "2" = "PROFISSIONAIS DAS CIÊNCIAS E DAS ARTES",
+                        "3" = " TÉCNICOS DE NÍVEL MÉDIO",
+                        "4" = "TRABALHADORES DE SERVIÇOS ADMINISTRATIVOS",
+                        "5" = "TRABALHADORES DOS SERVIÇOS, VENDEDORES DO COMÉRCIO EM LOJAS E MERCADOS",
+                        "6" = "TRABALHADORES AGROPECUÁRIOS, FLORESTAIS E DA PESCA",
+                        "7" = "TRABALHADORES DA PRODUÇÃO DE BENS E SERVIÇOS INDUSTRIAIS",
+                        "8" = "TRABALHADORES DA PRODUÇÃO DE BENS E SERVIÇOS INDUSTRIAIS",
+                        "9" = "TRABALHADORES DE REPARAÇÃO E MANUTENÇÃO",
+                       "10" = "MEMBROS DAS FORÇAS ARMADAS, POLICIAIS E BOMBEIROS MILITARES"
+  )) |> 
+
+  
+# Recodificação da variável exerce atividade remunerada
+mutate(
+  atividade_remunerada = case_when(
+    !is.na(id_ocupa_n) & id_ocupa_n != "" ~ "Exerce atividade remunerada",
+    is.na(id_ocupa_n) | id_ocupa_n == "" ~ "Não exerce atividade remunerada"))  |>
+  
+# Recodificação da variável tipo de violência
+  mutate(
+     violencia_fisica = case_when(
+      viol_fisic == 1 ~ "Sim",
+      viol_fisic == 2 ~ "Não",
+      viol_fisic == 9 ~ "Ignorado"
+    ),
+     violencia_psico = case_when(
+      viol_psico == 1 ~ "Sim",
+      viol_psico == 2 ~ "Não",
+      viol_psico == 9 ~ "Ignorado"
+    ),
+     violencia_tort = case_when(
+      viol_tort == 1 ~ "Sim",
+      viol_tort == 2 ~ "Não",
+      viol_tort == 9 ~ "Ignorado"
+    ),
+     violencia_sexu = case_when(
+      viol_sexu == 1 ~ "Sim",
+      viol_sexu == 2 ~ "Não"
+    ),
+     violencia_traf = case_when(
+      viol_traf == 1 ~ "Sim",
+      viol_traf == 2 ~ "Não",
+      viol_traf == 9 ~ "Ignorado"
+    ),
+    violencia_finan = case_when(
+      viol_finan == 1 ~ "Sim",
+      viol_finan == 2 ~ "Não",
+      viol_finan == 9 ~ "Ignorado"
+    ),
+    violencia_negli = case_when(
+      viol_negli == 1 ~ "Sim",
+      viol_negli == 2 ~ "Não",
+      viol_negli == 9 ~ "Ignorado"
+    ),
+    violencia_infan = case_when(
+      viol_infan == 1 ~ "Sim",
+      viol_infan == 2 ~ "Não",
+      viol_infan == 9 ~ "Ignorado"
+    ),
+    violencia_legal = case_when(
+      viol_legal == 1 ~ "Sim",
+      viol_legal == 2 ~ "Não",
+      viol_legal == 9 ~ "Ignorado"
+    ))  |> 
+
+# Recodificação da variável municípios com seus respectivos códigos
+  mutate(
+    nome_municipio = case_when(
+      as.character(id_municip) == "110001" ~ "Alta Floresta D'Oeste",
+      as.character(id_municip) == "110002" ~ "Ariquemes",
+      as.character(id_municip) == "110003" ~ "Cabixi",
+      as.character(id_municip) == "110004" ~ "Cacoal",
+      as.character(id_municip) == "110005" ~ "Cerejeiras",
+      as.character(id_municip) == "110006" ~ "Colorado do Oeste",
+      as.character(id_municip) == "110007" ~ "Corumbiara",
+      as.character(id_municip) == "110008" ~ "Costa Marques",
+      as.character(id_municip) == "110009" ~ "Espigão D'Oeste",
+      as.character(id_municip) == "110010" ~ "Guajará-Mirim",
+      as.character(id_municip) == "110011" ~ "Jaru",
+      as.character(id_municip) == "110012" ~ "Ji-Paraná",
+      as.character(id_municip) == "110013" ~ "Machadinho D'Oeste",
+      as.character(id_municip) == "110014" ~ "Nova Brasilândia D'Oeste",
+      as.character(id_municip) == "110015" ~ "Ouro Preto do Oeste",
+      as.character(id_municip) == "110018" ~ "Pimenta Bueno",
+      as.character(id_municip) == "110020" ~ "Porto Velho",
+      as.character(id_municip) == "110025" ~ "Presidente Médici",
+      as.character(id_municip) == "110026" ~ "Rio Crespo",
+      as.character(id_municip) == "110028" ~ "Rolim de Moura",
+      as.character(id_municip) == "110029" ~ "Santa Luzia D'Oeste",
+      as.character(id_municip) == "110030" ~ "Vilhena",
+      as.character(id_municip) == "110032" ~ "São Miguel do Guaporé",
+      as.character(id_municip) == "110033" ~ "Nova Mamoré",
+      as.character(id_municip) == "110034" ~ "Alvorada D'Oeste",
+      as.character(id_municip) == "110037" ~ "Alto Alegre dos Parecis",
+      as.character(id_municip) == "110040" ~ "Alto Paraíso",
+      as.character(id_municip) == "110045" ~ "Buritis",
+      as.character(id_municip) == "110050" ~ "Novo Horizonte do Oeste",
+      as.character(id_municip) == "110060" ~ "Cacaulândia",
+      as.character(id_municip) == "110070" ~ "Campo Novo de Rondônia",
+      as.character(id_municip) == "110080" ~ "Candeias do Jamari",
+      as.character(id_municip) == "110090" ~ "Castanheiras",
+      as.character(id_municip) == "110092" ~ "Chupinguaia",
+      as.character(id_municip) == "110094" ~ "Cujubim",
+      as.character(id_municip) == "110100" ~ "Governador Jorge Teixeira",
+      as.character(id_municip) == "110110" ~ "Itapuã do Oeste",
+      as.character(id_municip) == "110120" ~ "Ministro Andreazza",
+      as.character(id_municip) == "110130" ~ "Mirante da Serra",
+      as.character(id_municip) == "110140" ~ "Monte Negro",
+      as.character(id_municip) == "110143" ~ "Nova União",
+      as.character(id_municip) == "110145" ~ "Parecis",
+      as.character(id_municip) == "110146" ~ "Pimenteiras do Oeste",
+      as.character(id_municip) == "110147" ~ "Primavera de Rondônia",
+      as.character(id_municip) == "110148" ~ "São Felipe D'Oeste",
+      as.character(id_municip) == "110149" ~ "São Francisco do Guaporé",
+      as.character(id_municip) == "110150" ~ "Seringueiras",
+      as.character(id_municip) == "110155" ~ "Teixeirópolis",
+      as.character(id_municip) == "110160" ~ "Theobroma",
+      as.character(id_municip) == "110170" ~ "Urupá",
+      as.character(id_municip) == "110175" ~ "Vale do Anari",
+      as.character(id_municip) == "110180" ~ "Vale do Paraíso",
+      TRUE ~ "Município não identificado"
+    ))
+
+# Visualização inicial da estrutura da base VIOBR recodificada
+glimpse(VIOBR_recodificados)
+
+#Filtragem e padronização da base VIOBR para o estado de Rondônia (RO)
+VIOBR_base <- VIOBR_recodificados |>
+  filter(sg_uf == 11) |>
+  mutate(sg_uf = "RO") |>
+  select(
+    id_municip,
+    sg_uf,
+    nu_ano,
+    nome_municipio,
+    idade_anos,
+    faixa_etaria,
+    escolaridade,
+    raca,
+    orient_sex,
+    ident_gen,
+    viol_motiv,
+    cicl_vid,
+    sexo_agressor,
+    consumo_alcool_agressor,
+    local_ocor,
+    out_vezes,
+    meio_agressao,
+    relacao_pessoa_atendida,
+    consumo_rel,
+    viol_sexu_tipo,
+    situacao_conjugal,
+    violencia_fisica,    
+    violencia_psico,     
+    violencia_tort,     
+    violencia_sexu,     
+    violencia_traf,    
+    violencia_finan,   
+    violencia_negli,   
+    violencia_infan,    
+    violencia_legal,
+    grupo_cbo,
+    grupo_nome,
+    atividade_remunerada) |>
+  rename(uf = sg_uf, ano = nu_ano)
+
+# Verificação de cobertura temporal
+unique(VIOBR_base$ano)
+
+# Verificar se o ID "110110" está em VIOBR
+if ("110110" %in% unique(VIOBR$id_municip)) {
+  message("VIOBR_base: O ID 110110 (Itapuã do Oeste) está presente.")
+} else {
+  message("VIOBR_base: O ID 110110 (Itapuã do Oeste) NÃO está presente.")
+}
+
+
+library(openxlsx)
+write.xlsx(VIOBR_base, "VIOBR_base.xlsx")
+
