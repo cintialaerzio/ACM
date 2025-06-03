@@ -474,6 +474,10 @@ write.csv(tabela_categorias, "tabela_categorias_clusters.csv", row.names = FALSE
 
 
 
+
+
+
+
 #TABELAS UTILIZADAS
 
 # TABELA 4: Contribuição e Qualidade das Categorias nas Dimensões 1 e 2
@@ -486,12 +490,12 @@ cos2 <- as.data.frame(res_mca$var$cos2)
 cos2$Categoria <- rownames(cos2)
 
 cos2 <- cos2 %>%
-  mutate(Qualidade_2_Dimensoes = `Dim 1` + `Dim 2`)
+  mutate(Qualidade_2_Dimensoes = Dim 1 + Dim 2)
 
 tabela_contrib_qualidade <- contrib_rel %>%
   select(Categoria,
-         `Contribuição Relativa Eixo 1` = `Dim 1`,
-         `Contribuição Relativa Eixo 2` = `Dim 2`) %>%
+         Contribuição Relativa Eixo 1 = Dim 1,
+         Contribuição Relativa Eixo 2 = Dim 2) %>%
   left_join(cos2 %>% select(Categoria, Qualidade_2_Dimensoes),
             by = "Categoria") %>%
   mutate(across(where(is.numeric), ~ round(., 3)))  # arredonda valores para 3 casas decimais
@@ -505,14 +509,14 @@ library(dplyr)
 library(openxlsx)
 
 top10_eixo1 <- tabela_contrib_qualidade %>%
-  arrange(desc(`Contribuição Relativa Eixo 1`)) %>%
+  arrange(desc(Contribuição Relativa Eixo 1)) %>%
   slice(1:10) 
 
 # Salvar como Excel
 write.xlsx(top10_eixo1, file = "Top10_Eixo1_Tabela.xlsx", rowNames = FALSE)
 
 top10_eixo2 <- tabela_contrib_qualidade %>%
-  arrange(desc(`Contribuição Relativa Eixo 2`)) %>%
+  arrange(desc(Contribuição Relativa Eixo 2)) %>%
   slice(1:10)
 
 write.xlsx(top10_eixo2, file = "Top10_Eixo2_Tabela.xlsx", rowNames = FALSE)
@@ -526,24 +530,23 @@ contrib_rel <- as.data.frame(res_mca$var$contrib)
 contrib_rel$Categoria <- rownames(contrib_rel)
 
 tabela_final <- coords %>%
-  select(Categoria, `Dim 1`, `Dim 2`) %>%
+  select(Categoria, Dim 1, Dim 2) %>%
   left_join(
     contrib_rel %>%
-      select(Categoria, `Dim 1`, `Dim 2`),
+      select(Categoria, Dim 1, Dim 2),
     by = "Categoria"
   ) %>%
   rename(
-    coord1 = `Dim 1.x`,
-    coord2 = `Dim 2.x`,
-    contrib1 = `Dim 1.y`,
-    contrib2 = `Dim 2.y`
+    coord1 = Dim 1.x,
+    coord2 = Dim 2.x,
+    contrib1 = Dim 1.y,
+    contrib2 = Dim 2.y
   ) %>%
   mutate(
-    `Coord. 1` = round(coord1, 3),
-    `Coord. 2` = round(coord2, 3),
-    `Contrib. 1 (%)` = round(contrib1, 2),
-    `Contrib. 2 (%)` = round(contrib2, 2)
+    Coord. 1 = round(coord1, 3),
+    Coord. 2 = round(coord2, 3),
+    Contrib. 1 (%) = round(contrib1, 2),
+    Contrib. 2 (%) = round(contrib2, 2)
   ) %>%
-  select(Categoria, `Coord. 1`, `Coord. 2`, `Contrib. 1 (%)`, `Contrib. 2 (%)`)
+  select(Categoria, Coord. 1, Coord. 2, Contrib. 1 (%), Contrib. 2 (%))
 write.xlsx(tabela_final, file = "Tabela_5.xlsx", rowNames = FALSE)
- 
