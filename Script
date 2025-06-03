@@ -1,0 +1,549 @@
+
+# Começo --------------------------ACM----------------------------------------
+#install.packages("rio")
+
+library(missMDA)
+
+# --- Pacotes necessários ---
+library(missMDA)
+library(FactoMineR)
+library(tidyverse)
+library(rio)
+library(summarytools)
+
+# --- Pacotes necessários ---
+library(missMDA)
+library(FactoMineR)
+library(tidyverse)
+library(rio)
+library(summarytools)
+
+# --- Diretório de trabalho ---
+getwd()
+
+# --- Importar dados ---
+data <- import("VIOBR_base.xlsx")
+
+table(data$nome_municipio)
+
+data.set <- import("VIORO.xlsx") %>%
+  mutate(
+    faixa_etaria_grupo = case_when(
+      faixa_etaria %in% c("A1 - 00 a 09 anos", "A2 - 10 a 19 anos") ~ "A: Até 19 anos",
+      faixa_etaria %in% c("A3 - 20 a 29 anos", "A4 - 30 a 39 anos") ~ "A: 20 a 39 anos",
+      faixa_etaria %in% c("A5 - 40 a 49 anos", "A6 - 50 a 59 anos", "A7 - 60 anos ou mais") ~ "A: 40 anos ou mais"
+    ),
+    cs_sexo_grupo = case_when(
+      cs_sexo == "B1 - Masculino" ~ "B: Masculino",
+      cs_sexo == "B2 - Feminino" ~ "B: Feminino"
+    ),
+    escolaridade_grupo = case_when(
+      escolaridade %in% c("C1 - Analfabeto", "C2 - 1ª a 4ª série incompleta do EF", "C3 - 4ª série completa do EF (antigo 1º grau)",
+                         "C4 - 5ª à 8ª série incompleta do EF (antigo ginásio ou 1º grau)", "C5 -  Ensino fundamental completo (antigo ginásio ou 1º grau)") ~ "C: Fundamental ou menos",
+      escolaridade %in% c("C6 - Ensino médio incompleto (antigo colegial ou 2º grau)", "C7 - Ensino médio completo (antigo colegial ou 2º grau)") ~ "C: Médio",
+      escolaridade %in% c("C8 - Educação superior incompleta", "C9 - Educação superior completa") ~ "C: Superior"
+    ),
+    raca_grupo = case_when(
+      raca == "D1 - Branca" ~ "D: Branca",
+      raca %in% c("D2 - Preta", "D4 - Parda") ~ "D: Preta/Parda",
+      raca %in% c("D3 - Amarela", "D5 - Indígena") ~ "D: Outras"
+    ),
+    cicl_vid_grupo = case_when(
+      cicl_vid %in% c("G1 - Criança", "G2 - Adolescente") ~ "G:Até adolescente",
+      cicl_vid == "G3 - Jovem" ~ "G: Jovem",
+      cicl_vid %in% c("G4 - Pessoa adulta", "G5 - Pessoa idosa") ~ "G: Adulto"
+    ),
+    sexo_agressor_grupo = case_when(
+      sexo_agressor == "H1 - Masculino" ~ "H: Masculino",
+      sexo_agressor == "H2 - Feminino" ~ "H: Feminino",
+      sexo_agressor == "H3 - Ambos" ~ "H: Ambos"
+    ),
+    consumo_alcool_agressor_grupo = case_when(
+      consumo_alcool_agressor == "I1 - Consumiu álcool" ~ "I: Consumiu álcool",
+      consumo_alcool_agressor == "I2 - Não consumiu álcool" ~ "I: Não consumiu álcool"
+    ),
+    out_vezes_grupo = case_when(
+      out_vezes == "J1 - Repetiu" ~ "J: Reincidente",
+      out_vezes == "J2 - Não repetiu" ~ "J: Não reincidente"
+    ),
+    meio_agressao_grupo = case_when(
+      meio_agressao == "K2 - Força física" ~ "K: Força física",
+      meio_agressao %in% c("K1 - Ameaça", "K3 - Armas/Objetos", "K4 - Envenenamento", "K5 - Fogo") ~ "K: Outros meios"
+    ),
+    relacao_pessoa_atendida_grupo = case_when(
+      relacao_pessoa_atendida %in% c("L1 - Cônjuge", "L2 - Ex-cônjuge", "L3 - Namorado(a)", "L4 - Ex-namorado(a)") ~ "L: Parceiro íntimo",
+      relacao_pessoa_atendida %in% c("L5 - Mãe", "L6 - Pai", "L7 - Filho(a)", "L8 -  Padrasto/Madrasta", "L9 - Irmão(ã)") ~ "L: Familiar"
+    ),
+    situacao_conjugal_grupo = case_when(
+      situacao_conjugal == "N1 - Solteiro" ~ "N: Solteiro",
+      situacao_conjugal == "N2 -  Casado/União consensual" ~ "N: Casado/União consensual",
+      situacao_conjugal %in% c("N3 - Separado", "N4 - Viúvo") ~ "N: Separado/Viúvo"
+    )
+  ) %>% 
+  select(
+    faixa_etaria_grupo, cs_sexo_grupo, escolaridade_grupo, raca_grupo, 
+    cicl_vid_grupo, sexo_agressor_grupo, consumo_alcool_agressor_grupo, 
+    out_vezes_grupo, meio_agressao_grupo, relacao_pessoa_atendida_grupo, 
+    situacao_conjugal_grupo
+  ) %>%
+  mutate(across(everything(), as.factor)) 
+
+# Dicionário para renomear as variáveis (para referência futura)
+renomear_variaveis <- c(
+  "cicl_vid_grupo" = "Grupo de Ciclo de Vida",
+  "consumo_alcool_agressor_grupo" = "Álcool (agressor)",
+  "cs_sexo_grupo" = "Sexo da vítima",
+  "escolaridade_grupo" = "Escolaridade",
+  "faixa_etaria_grupo" = "Faixa etária",
+  "meio_agressao_grupo" = "Meio de agressão",
+  "out_vezes_grupo" = "Reincidência",
+  "raca_grupo" = "Raça/Cor",
+  "relacao_pessoa_atendida_grupo" = "Relação com agressor",
+  "sexo_agressor_grupo" = "Sexo do agressor",
+  "situacao_conjugal_grupo" = "Situação conjugal"
+)
+
+
+# --- 1. Pré-processamento e imputação dos dados ---
+
+# Converter todas as colunas para fator
+data.set[] <- lapply(data.set, as.factor)
+
+# Estimar o número ótimo de dimensões para imputação MCA
+ncp_estimado <- estim_ncpMCA(data.set, ncp.max = 2)
+
+# Imputar os dados com o ncp estimado
+data.set.imputado <- imputeMCA(data.set, ncp = ncp_estimado$ncp)$completeObs
+
+# Verificar estrutura dos dados imputados
+str(data.set.imputado)
+head(data.set.imputado)
+
+# Converter dados imputados para matriz (necessário para análises matriciais)
+X <- as.matrix(data.set.imputado)
+class(X)
+
+# --- 2. Preparação da matriz disjunta completa (dados binarizados) ---
+
+# Transformar as variáveis categóricas em matriz disjunta (variáveis binárias)
+cat <- TRUE  # variável categórica
+burt <- TRUE # potencializar matriz Burt
+
+if(cat) {
+  Z <- tab.disjonctif(data.set.imputado)  # Matriz disjunta completa
+} else {
+  Z <- X
+}
+
+# --- 3. Construção da matriz Burt (se burt == TRUE) ---
+
+if(burt) {
+  # Matriz Burt: Z'Z
+  ZB <- t(Z) %*% Z
+} else {
+  ZB <- Z
+}
+
+# --- 4. Cálculos das matrizes probabilísticas e perfis ---
+
+# Total de elementos (n)
+n <- sum(ZB)
+
+# Soma das linhas e colunas da matriz Burt
+marg_linhas <- rowSums(ZB)
+marg_colunas <- colSums(ZB)
+
+# Matriz de proporções (matriz P chapeu) — estimativa conjunta das frequências relativas
+P_hat <- ZB / n  # P_hat = nij / n
+
+# Vetores marginais normalizados (perfis marginais das linhas e colunas)
+r <- marg_linhas / n  # perfil das linhas
+c <- marg_colunas / n  # perfil das colunas
+
+# Matriz diagonal dos perfis (linhas e colunas)
+Dr_inv <- solve(diag(r))  # inversa da matriz diagonal das linhas
+Dc_inv <- solve(diag(c))  # inversa da matriz diagonal das colunas
+
+# Matriz de perfis das linhas (Dr^-1 * P_hat)
+R <- Dr_inv %*% P_hat
+
+# Matriz de perfis das colunas (P_hat * Dc^-1)
+C <- P_hat %*% Dc_inv
+
+# --- 5. Cálculo do Qui-quadrado observado e teste de independência ---
+
+# Matriz dos resíduos padronizados (P_hat - r c^T)
+M <- P_hat - r %*% t(c)
+
+# Estatística qui-quadrado observada
+qui_observado <- n * sum(diag(Dr_inv %*% M %*% Dc_inv %*% t(M)))
+
+# Graus de liberdade
+gl <- (ncol(ZB) - 1) * (nrow(ZB) - 1)
+
+# Valor crítico do qui-quadrado para 95% de confiança
+qui_critico <- qchisq(0.95, df = gl)
+
+# Decisão do teste
+if(qui_observado > qui_critico) {
+  print("Rejeita-se H0: linhas e colunas são DEPENDENTES.")
+} else {
+  print("Aceita-se H0: linhas e colunas são INDEPENDENTES.")
+}
+
+# --- 6. Decomposição para Análise de Correspondência (SVD) ---
+
+# Matriz para decomposição Z = Dr^-1/2 (P_hat - r c^T) Dc^-1/2
+Dr_inv_sqrt <- sqrt(Dr_inv)
+Dc_inv_sqrt <- sqrt(Dc_inv)
+
+Z_svd <- Dr_inv_sqrt %*% M %*% Dc_inv_sqrt
+
+# Decomposição em valores singulares
+svd_dec <- svd(Z_svd)
+
+# Matrizes U, V e vetor de valores singulares lambda
+U <- svd_dec$u
+V <- svd_dec$v
+lambda <- svd_dec$d
+
+# Matriz A (escalada pelas marginais das linhas)
+A <- sqrt(diag(r)) %*% U
+
+# Matriz B (escalada pelas marginais das colunas)
+B <- sqrt(diag(c)) %*% V
+
+# Proporção da variância explicada por cada componente
+prop_var <- round(lambda^2 / sum(lambda^2), 3) * 100
+
+# --- 7. Cálculo das coordenadas para plotagem ---
+
+# Coordenadas das linhas (observações)
+coord_linhas <- Dr_inv %*% A %*% diag(lambda)
+
+# Coordenadas das colunas (variáveis)
+coord_colunas <- Dc_inv %*% B %*% diag(lambda)
+
+# --- 8. Plotagem do mapa de correspondência ---
+
+plot(coord_linhas,
+     xlab = paste("Dimensão 1 - ", prop_var[1], "%", sep=""),
+     ylab = paste("Dimensão 2 - ", prop_var[2], "%", sep=""),
+     pch = 17, col = "red",
+     xlim = c(min(coord_linhas[,1], coord_colunas[,1]),
+              max(coord_linhas[,1], coord_colunas[,1])),
+     ylim = c(min(coord_linhas[,2], coord_colunas[,2]),
+              max(coord_linhas[,2], coord_colunas[,2]))
+)
+
+abline(h = 0, v = 0, lty = 3)
+
+points(coord_colunas, pch = 16, col = "blue")
+
+# Adicionar rótulos (exemplo para colunas)
+text(coord_colunas, labels = gsub(".*:", "", colnames(ZB)), pos = 4, cex = 0.7)
+
+# No pacote
+
+# MAPA  - ACM com matriz de Burt
+# Carregar pacotes
+library(FactoMineR)
+library(factoextra)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+# Renomear colunas para melhor apresentação
+data.set.imputado <- data.set.imputado %>%
+  rename(
+    "Faixa etária da vítima" = faixa_etaria_grupo,
+    "Sexo da vítima" = cs_sexo_grupo,
+    "Escolaridade da vítima" = escolaridade_grupo,
+    "Raça/Cor da vítima" = raca_grupo,
+    "Ciclo de Vida do Agressor" = cicl_vid_grupo,
+    "Sexo do agressor" = sexo_agressor_grupo,
+    "Consumo de Álcool pelo agressor" = consumo_alcool_agressor_grupo,
+    "Reincidência" = out_vezes_grupo,
+    "Meio de agressão" = meio_agressao_grupo,
+    "Relação com agressor" = relacao_pessoa_atendida_grupo,
+    "Situação conjugal" = situacao_conjugal_grupo
+  )
+
+# Executar a MCA com matriz de Burt
+res.mca <- MCA(data.set.imputado, method = "Burt", graph = FALSE)
+
+# Dataframe com coordenadas das variáveis
+categorias_burt <- sapply(data.set.imputado, function(x) nlevels(as.factor(x)))
+acm_burt_df <- data.frame(
+  res.mca$var$coord,
+  Variável = rep(names(categorias_burt), categorias_burt),
+  Categoria = rownames(res.mca$var$coord)
+)
+
+# Limpar nomes das categorias
+acm_burt_df$Categoria <- gsub("^\\w:\\s*", "", acm_burt_df$Categoria)
+
+# Ordenar níveis da variável
+acm_burt_df$Variável <- factor(acm_burt_df$Variável, levels = unique(acm_burt_df$Variável))
+
+# Definir formatos para shapes
+shape_values <- 0:(length(unique(acm_burt_df$Variável)) - 1)
+
+# Mapa perceptual (categorias)
+plot <- ggplot(acm_burt_df, aes(x = Dim.1, y = Dim.2, label = Categoria,
+                                color = Variável, shape = Variável)) +
+  geom_point(size = 3) +
+  geom_text_repel(size = 3, show.legend = FALSE, max.overlaps = Inf) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  labs(
+    title = "Mapa Perceptual – Violência Doméstica em Rondônia(2019-2024)",
+    x = paste0("Dimensão 1 (", round(res.mca$eig[1, 2], 1), "% de inércia)"),
+    y = paste0("Dimensão 2 (", round(res.mca$eig[2, 2], 1), "% de inércia)"),
+    caption = "Análise de Correspondência Múltipla usando matriz de Burt"
+  ) +
+  scale_color_viridis_d() +
+  scale_shape_manual(values = shape_values) +
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "white"),
+    panel.grid = element_line(color = "grey90"),
+    plot.background = element_rect(fill = "white"),
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+
+# Exibir o gráfico
+print(plot)
+
+ggsave("Mapa_Perceptual_ACM_Categorias.png", plot = plot,
+       width = 10, height = 8, dpi = 300)
+
+
+# ---------------------
+# Variância explicada
+# ---------------------
+res.mca$eig
+
+eig_plot <- fviz_eig(
+  res.mca,
+  addlabels = TRUE,
+  ylim = c(0, 40),
+  barfill = "#1E90FF",
+  barcolor = "#1E90FF",
+  linecolor = "#FF4500",
+  xlab = "Dimensões",
+  ylab = "Variância Explicada (%)",
+  ggtheme = theme_minimal(),
+  title = "Análise de Variância Explicada",
+  font.main = c(14, "bold"),
+  font.x = c(12, "bold"),
+  font.y = c(12, "bold")
+) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "black")
+  )
+
+ggsave("eig_plot_mca_imputado.png", plot = eig_plot, width = 8, height = 6, dpi = 600, bg = "white")
+
+# ---------------------
+# Distribuição dos indivíduos
+# ---------------------
+ind_plot <- fviz_mca_ind(
+  res.mca,
+  repel = TRUE,
+  geom = "point",
+  title = "Distribuição dos Indivíduos no Plano Fatorial"
+) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "black")
+  )
+
+ggsave("distribuicao_individuos_imputado.png", plot = ind_plot, width = 8, height = 6, dpi = 600, bg = "white")
+
+# ---------------------
+# Contribuições das categorias
+# ---------------------
+# Gráficos básicos (top 10 categorias)
+fviz_contrib(res.mca, choice = "var", axes = 1, top = 10)
+fviz_contrib(res.mca, choice = "var", axes = 2, top = 10)
+
+# Gráfico 1: Contribuições para Dimensão 1
+grafico_dim1 <- fviz_contrib(res.mca, choice = "var", axes = 1, top = 10) +
+  labs(
+    y = "Contribuição (%)",
+    title = "Contribuições das Categorias para a Dimensão 1"
+  ) +
+  theme(
+    axis.title.x = element_blank(),
+    panel.grid = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_blank()
+  )
+
+# Gráfico 2: Contribuições para Dimensão 2
+grafico_dim2 <- fviz_contrib(res.mca, choice = "var", axes = 2, top = 10) +
+  labs(
+    y = "Contribuição (%)",
+    title = "Contribuições das Categorias para a Dimensão 2"
+  ) +
+  theme(
+    axis.title.x = element_blank(),
+    panel.grid = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_blank()
+  )
+
+# Salvar gráficos das contribuições
+ggsave("contrib_dimensao1_imputado.png", plot = grafico_dim1, width = 8, height = 6, dpi = 300)
+ggsave("contrib_dimensao2_imputado.png", plot = grafico_dim2, width = 8, height = 6, dpi = 300)
+
+
+# ----------------------------------------------------------
+# Etapas adicionais: Cluster hierárquico e biplot colorido
+# ----------------------------------------------------------
+
+res_mca <- MCA(data.set.imputado, method = "Burt", graph = FALSE)  # graph=FALSE para evitar gráficos automáticos
+
+# 2. Extrair as coordenadas dos indivíduos
+coord_ind <- res_mca$ind$coord
+
+# 3. Calcular as distâncias euclidianas
+dist_mca <- dist(coord_ind)
+
+# 4. Agrupamento hierárquico com método de Ward
+hc_ward <- hclust(dist_mca, method = "ward.D2")
+
+# 5. Plot do dendrograma
+plot(hc_ward, labels = FALSE, main = "Dendrograma - Método de Ward")
+
+# 6. Escolher número de grupos (ex: 3)
+grupos <- cutree(hc_ward, k = 3)
+rect.hclust(hc_ward, k = 3, border = "red")
+
+# Salvar como PNG
+png("dendrograma_clusters.png", width = 800, height = 600)
+plot(hc_ward, labels = FALSE, hang = -1, main = "Dendrograma - Classificação Hierárquica (Ward)")
+rect.hclust(hc_ward, k = 3, border = "red")
+dev.off()
+
+
+# 7. Visualizar no plano fatorial
+grafico_mca <- fviz_mca_biplot(res_mca,
+                               habillage = as.factor(grupos),
+                               palette = c("red", "blue", "green"),
+                               addEllipses = TRUE,
+                               label = "var",
+                               title = "Biplot da ACM com clusterização hierárquica
+aglomerativa (método de Ward)")
+ggsave("mca_biplot_clusters_imputado.png", plot = grafico_mca, width = 8, height = 6, dpi = 300)
+
+# TABELA DOS AGRUPAMENTOS BIPLOT
+library(FactoMineR)
+library(factoextra)
+
+# 1. Coordenadas das categorias (variáveis)
+coord_var <- res_mca$var$coord
+
+# 2. Aplicar cluster hierárquico nas categorias
+dist_var <- dist(coord_var)                          # distância entre categorias
+hc_var <- hclust(dist_var, method = "ward.D2")       # método de Ward
+
+# 3. Definir número de grupos (ex: 3 clusters)
+grupos_var <- cutree(hc_var, k = 3)
+
+# 4. Montar tabela
+tabela_categorias <- as.data.frame(coord_var)
+tabela_categorias$Categoria <- rownames(tabela_categorias)
+tabela_categorias$Grupo <- as.factor(grupos_var)
+
+# 5. Reorganizar colunas
+tabela_categorias <- tabela_categorias[, c("Categoria", "Grupo", colnames(coord_var))]
+
+# 6. Visualizar
+head(tabela_categorias)
+
+# 7. (opcional) Exportar
+write.csv(tabela_categorias, "tabela_categorias_clusters.csv", row.names = FALSE)
+
+
+
+#TABELAS UTILIZADAS
+
+# TABELA 4: Contribuição e Qualidade das Categorias nas Dimensões 1 e 2
+library(dplyr)
+
+contrib_rel <- as.data.frame(res_mca$var$contrib)
+contrib_rel$Categoria <- rownames(contrib_rel)
+
+cos2 <- as.data.frame(res_mca$var$cos2)
+cos2$Categoria <- rownames(cos2)
+
+cos2 <- cos2 %>%
+  mutate(Qualidade_2_Dimensoes = `Dim 1` + `Dim 2`)
+
+tabela_contrib_qualidade <- contrib_rel %>%
+  select(Categoria,
+         `Contribuição Relativa Eixo 1` = `Dim 1`,
+         `Contribuição Relativa Eixo 2` = `Dim 2`) %>%
+  left_join(cos2 %>% select(Categoria, Qualidade_2_Dimensoes),
+            by = "Categoria") %>%
+  mutate(across(where(is.numeric), ~ round(., 3)))  # arredonda valores para 3 casas decimais
+print(tabela_contrib_qualidade)
+
+library(openxlsx)
+write.xlsx(tabela_contrib_qualidade, file = "Tabela_4.xlsx", rowNames = FALSE)
+
+### TESTE
+library(dplyr)
+library(openxlsx)
+
+top10_eixo1 <- tabela_contrib_qualidade %>%
+  arrange(desc(`Contribuição Relativa Eixo 1`)) %>%
+  slice(1:10) 
+
+# Salvar como Excel
+write.xlsx(top10_eixo1, file = "Top10_Eixo1_Tabela.xlsx", rowNames = FALSE)
+
+top10_eixo2 <- tabela_contrib_qualidade %>%
+  arrange(desc(`Contribuição Relativa Eixo 2`)) %>%
+  slice(1:10)
+
+write.xlsx(top10_eixo2, file = "Top10_Eixo2_Tabela.xlsx", rowNames = FALSE)
+
+
+# TABELA 5 -  Coordenadas principais e contribuições das categorias nos dois primeiros eixos
+coords <- as.data.frame(res_mca$var$coord)
+coords$Categoria <- rownames(coords)
+
+contrib_rel <- as.data.frame(res_mca$var$contrib)
+contrib_rel$Categoria <- rownames(contrib_rel)
+
+tabela_final <- coords %>%
+  select(Categoria, `Dim 1`, `Dim 2`) %>%
+  left_join(
+    contrib_rel %>%
+      select(Categoria, `Dim 1`, `Dim 2`),
+    by = "Categoria"
+  ) %>%
+  rename(
+    coord1 = `Dim 1.x`,
+    coord2 = `Dim 2.x`,
+    contrib1 = `Dim 1.y`,
+    contrib2 = `Dim 2.y`
+  ) %>%
+  mutate(
+    `Coord. 1` = round(coord1, 3),
+    `Coord. 2` = round(coord2, 3),
+    `Contrib. 1 (%)` = round(contrib1, 2),
+    `Contrib. 2 (%)` = round(contrib2, 2)
+  ) %>%
+  select(Categoria, `Coord. 1`, `Coord. 2`, `Contrib. 1 (%)`, `Contrib. 2 (%)`)
+write.xlsx(tabela_final, file = "Tabela_5.xlsx", rowNames = FALSE)
+ 
